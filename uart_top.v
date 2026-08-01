@@ -1,3 +1,12 @@
+// ================================================================
+// UART Top Module
+// Properties of this UART module:
+// - 8 data bits
+// - 1 stop bit
+// - No parity
+// - Baud rate and clock frequency configurable via parameter
+// ================================================================
+
 module uart_top #(
     parameter clk_freq = 25_000_000,
     parameter baud = 115200

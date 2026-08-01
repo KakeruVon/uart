@@ -10,11 +10,30 @@ module uart_tx #(
     output reg tx
 );
 
+// ================================================================
+// Clock cycles counter for baud rate generation
+// For a 25MHz clock and 115200 baud rate, we need to count 217 clock cycles per bit,
+// The actual boud rate is 25,000,000 / 217 = 115207.37, which is very close to 115200(0.0064% error).
+// ================================================================
 parameter bit_time = clk_freq / baud;
 reg [15:0] bit_cnt;
 reg [3:0] bit_idx;
+
+// ================================================================
+// Frame register to hold the data to be transmitted
+// Garantees that the data is stable during the transmission process.
+// ================================================================
 reg [7:0] frame;
 
+
+// ================================================================
+// FSM for UART transmission
+// States:
+// - STATE_IDLE: Waiting for tx_valid signal to start transmission
+// - STATE_START: Sending start bit (0)
+// - STATE_DATA: Sending data bits (LSB first)
+// - STATE_STOP: Sending stop bit (1)
+// ================================================================
 reg [1:0] state;
 parameter STATE_IDLE = 2'd0;
 parameter STATE_START = 2'd1;
