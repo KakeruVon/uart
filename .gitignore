@@ -1,1 +1,8 @@
 vide.toml
+
+work/
+uart.mpf
+vsim.wlf
+uart.cr.mti
+
+tb_uart.vcd
