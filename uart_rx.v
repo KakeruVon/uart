@@ -14,8 +14,8 @@ module uart_rx #(
 // For a 25MHz clock and 115200 baud rate, we need to count 217 clock cycles per bit,
 // The actual boud rate is 25,000,000 / 217 = 115207.37, which is very close to 115200(0.0064% error).
 // ================================================================
-parameter bit_time = clk_freq / baud;
-reg [15:0] bit_cnt;
+localparam bit_time = clk_freq / baud;
+reg [$clog2(bit_time)-1:0] bit_cnt;
 reg [3:0] bit_idx;
 
 // ================================================================
@@ -32,9 +32,9 @@ reg [7:0] frame;
 // - STATE_STOP: Receiving stop bit (1)
 // ================================================================
 reg [1:0] state;
-parameter STATE_IDLE = 2'd0;
-parameter STATE_DATA = 2'd1;
-parameter STATE_STOP = 2'd2;
+localparam STATE_IDLE = 2'd0;
+localparam STATE_DATA = 2'd1;
+localparam STATE_STOP = 2'd2;
 
 initial begin
     rx_valid = 1'b0;
