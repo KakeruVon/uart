@@ -20,10 +20,17 @@ reg [$clog2(bit_time)-1:0] bit_cnt;
 reg [3:0] bit_idx;
 
 // ================================================================
-// Frame register to hold the data to be received
+// Frame register
 // Garantees that the data is stable during the reception process.
 // ================================================================
 reg [7:0] frame;
+
+// ================================================================
+// Synchronization registers
+// 2 stage synchronizer to avoid metastability issues when sampling the asynchronous rx signal.
+// ================================================================
+reg rx_meta;
+reg rx_sync;
 
 // ================================================================
 // FSM for UART reception
@@ -40,11 +47,23 @@ localparam STATE_DATA = 2'd2;
 localparam STATE_STOP = 2'd3;
 
 initial begin
+    rx_meta <= 1'b1;
+    rx_sync <= 1'b1;
     rx_valid = 1'b0;
     rx_data = 8'd0;
     state = STATE_IDLE;
     bit_cnt <= 16'd0;
     bit_idx <= 4'd0;
+end
+
+always @(posedge clk or posedge rst) begin
+    if (rst) begin
+        rx_meta <= 1'b1;
+        rx_sync <= 1'b1;
+    end else begin
+        rx_meta <= rx;
+        rx_sync <= rx_meta;
+    end
 end
 
 always @(posedge clk or posedge rst) begin
@@ -57,7 +76,7 @@ always @(posedge clk or posedge rst) begin
     end else begin
         case (state)
             STATE_IDLE: begin
-                if (rx == 1'b0) begin // Start bit detected
+                if (rx_sync == 1'b0) begin // Start bit detected
                     state <= STATE_START;
                     bit_cnt <= 16'd0;
                     bit_idx <= 4'd0;
@@ -68,7 +87,7 @@ always @(posedge clk or posedge rst) begin
             end
             STATE_START: begin
                 if (bit_cnt < bit_time / 2 - 1) begin
-                    if (rx == 1'b0) begin
+                    if (rx_sync == 1'b0) begin
                         bit_cnt <= bit_cnt + 1; // Wait for half bit time to sample in the middle of the start bit
                     end else begin
                         bit_cnt <= 16'd0;
@@ -84,7 +103,7 @@ always @(posedge clk or posedge rst) begin
                     bit_cnt <= bit_cnt + 1;
                 end else begin
                     bit_cnt <= 16'd0;
-                    frame[bit_idx] <= rx; // Sample data bit
+                    frame[bit_idx] <= rx_sync; // Sample data bit
                     if (bit_idx < 7) begin
                         bit_idx <= bit_idx + 1;
                     end else begin
@@ -98,7 +117,7 @@ always @(posedge clk or posedge rst) begin
                     bit_cnt <= bit_cnt + 1;
                 end else begin
                     bit_cnt <= 16'd0;
-                    if (rx == 1'b1) begin // Stop bit should be high
+                    if (rx_sync == 1'b1) begin // Stop bit should be high
                         rx_data <= frame; // Capture received data
                         rx_valid <= 1'b1; // Indicate valid data received
                     end
