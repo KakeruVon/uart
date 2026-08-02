@@ -15,9 +15,11 @@ module uart_tx #(
 // Clock cycles counter for baud rate generation
 // For a 25MHz clock and 115200 baud rate, we need to count 217 clock cycles per bit,
 // The actual boud rate is 25,000,000 / 217 = 115207.37, which is very close to 115200(0.0064% error).
+// Parameter boundaries protected.
 // ================================================================
-localparam bit_time = clk_freq / baud;
-reg [$clog2(bit_time)-1:0] bit_cnt;
+localparam integer bit_time = (clk_freq + baud/2) / baud;
+localparam integer cnt_width = (bit_time > 1) ? $clog2(bit_time) : 1;
+reg [cnt_width-1:0] bit_cnt;
 reg [3:0] bit_idx;
 
 // ================================================================

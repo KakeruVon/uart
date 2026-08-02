@@ -14,9 +14,11 @@ module uart_rx #(
 // Clock cycles counter for baud rate generation
 // For a 25MHz clock and 115200 baud rate, we need to count 217 clock cycles per bit,
 // The actual boud rate is 25,000,000 / 217 = 115207.37, which is very close to 115200(0.0064% error).
+// Parameter boundaries protected.
 // ================================================================
-localparam bit_time = clk_freq / baud;
-reg [$clog2(bit_time)-1:0] bit_cnt;
+localparam integer bit_time = (clk_freq + baud/2) / baud;
+localparam integer cnt_width = (bit_time > 1) ? $clog2(bit_time) : 1;
+reg [cnt_width-1:0] bit_cnt;
 reg [3:0] bit_idx;
 
 // ================================================================
@@ -29,8 +31,8 @@ reg [7:0] frame;
 // Synchronization registers
 // 2 stage synchronizer to avoid metastability issues when sampling the asynchronous rx signal.
 // ================================================================
-reg rx_meta;
-reg rx_sync;
+(* ASYNC_REG = "TRUE" *) reg rx_meta;
+(* ASYNC_REG = "TRUE" *) reg rx_sync;
 
 // ================================================================
 // FSM for UART reception
@@ -94,8 +96,13 @@ always @(posedge clk or posedge rst) begin
                         state <= STATE_IDLE; // False start bit, go back to idle
                     end
                 end else begin
-                    bit_cnt <= 16'd0;
-                    state <= STATE_DATA;
+                    if (rx_sync == 1'b0) begin // Confirm start bit is still low in the middle of the bit time
+                        bit_cnt <= 16'd0;
+                        state <= STATE_DATA;
+                    end else begin
+                        bit_cnt <= 16'd0;
+                        state <= STATE_IDLE;
+                    end
                 end
             end
             STATE_DATA: begin
