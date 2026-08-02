@@ -55,10 +55,21 @@ always @(posedge clk or posedge rst) begin
         case (state)
             STATE_IDLE: begin
                 if (rx == 1'b0) begin // Start bit detected
-                    state <= STATE_DATA;
-                    bit_cnt <= 16'd0;
-                    bit_idx <= 4'd0;
-                    rx_valid <= 1'b0;
+                    if (bit_cnt < bit_time / 2 - 1) begin
+                        bit_cnt <= bit_cnt + 1; // Wait for half bit time to sample in the middle of the start bit
+                    end else begin
+                        state <= STATE_DATA;
+                        bit_cnt <= 16'd0;
+                        bit_idx <= 4'd0;
+                        rx_valid <= 1'b0;
+                    end
+                end else if (rx_valid) begin
+                    if (bit_cnt < bit_time - 1) begin
+                        bit_cnt <= bit_cnt + 1;
+                    end else begin
+                        bit_cnt <= 16'd0;
+                        rx_valid <= 1'b0; // Clear rx_valid after 1 bit time
+                    end
                 end
             end
             STATE_DATA: begin
@@ -78,8 +89,11 @@ always @(posedge clk or posedge rst) begin
                 if (bit_cnt < bit_time - 1) begin
                     bit_cnt <= bit_cnt + 1;
                 end else begin
-                    rx_valid <= 1'b1; // Data reception complete
-                    rx_data <= frame; // Output received data
+                    bit_cnt <= 16'd0;
+                    if (rx == 1'b1) begin // Stop bit should be high
+                        rx_data <= frame; // Capture received data
+                        rx_valid <= 1'b1; // Indicate valid data received
+                    end
                     state <= STATE_IDLE;
                 end
             end
