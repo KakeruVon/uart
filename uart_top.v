@@ -6,7 +6,7 @@
 // - No parity
 // - Baud rate and clock frequency configurable via parameter
 // ================================================================
-
+`timescale 1ns/1ps
 module uart_top #(
     parameter clk_freq = 25_000_000,
     parameter baud = 115200

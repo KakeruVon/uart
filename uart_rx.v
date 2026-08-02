@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module uart_rx #(
     parameter clk_freq = 25_000_000,
     parameter baud = 115200
@@ -28,13 +29,15 @@ reg [7:0] frame;
 // FSM for UART reception
 // States:
 // - STATE_IDLE: Waiting for start bit
+// - STATE_START: Waiting for a half bit time and receiving start bit (0)
 // - STATE_DATA: Receiving data bits (LSB first)
 // - STATE_STOP: Receiving stop bit (1)
 // ================================================================
 reg [1:0] state;
 localparam STATE_IDLE = 2'd0;
-localparam STATE_DATA = 2'd1;
-localparam STATE_STOP = 2'd2;
+localparam STATE_START = 2'd1;
+localparam STATE_DATA = 2'd2;
+localparam STATE_STOP = 2'd3;
 
 initial begin
     rx_valid = 1'b0;
@@ -55,21 +58,25 @@ always @(posedge clk or posedge rst) begin
         case (state)
             STATE_IDLE: begin
                 if (rx == 1'b0) begin // Start bit detected
-                    if (bit_cnt < bit_time / 2 - 1) begin
+                    state <= STATE_START;
+                    bit_cnt <= 16'd0;
+                    bit_idx <= 4'd0;
+                    rx_valid <= 1'b0;
+                end else if (rx_valid) begin
+                    rx_valid <= 1'b0; // Clear rx_valid after 1 clock cycle
+                end
+            end
+            STATE_START: begin
+                if (bit_cnt < bit_time / 2 - 1) begin
+                    if (rx == 1'b0) begin
                         bit_cnt <= bit_cnt + 1; // Wait for half bit time to sample in the middle of the start bit
                     end else begin
-                        state <= STATE_DATA;
                         bit_cnt <= 16'd0;
-                        bit_idx <= 4'd0;
-                        rx_valid <= 1'b0;
+                        state <= STATE_IDLE; // False start bit, go back to idle
                     end
-                end else if (rx_valid) begin
-                    if (bit_cnt < bit_time - 1) begin
-                        bit_cnt <= bit_cnt + 1;
-                    end else begin
-                        bit_cnt <= 16'd0;
-                        rx_valid <= 1'b0; // Clear rx_valid after 1 bit time
-                    end
+                end else begin
+                    bit_cnt <= 16'd0;
+                    state <= STATE_DATA;
                 end
             end
             STATE_DATA: begin
@@ -81,6 +88,7 @@ always @(posedge clk or posedge rst) begin
                     if (bit_idx < 7) begin
                         bit_idx <= bit_idx + 1;
                     end else begin
+                        bit_idx <= 4'd0;
                         state <= STATE_STOP;
                     end
                 end
